@@ -1,0 +1,121 @@
+---------------------------------------------------------------------------------
+title: StormAnalysis: Details about the storms and their impacts across USA
+output: 
+  html_document: 
+    keep_md: yes
+---------------------------------------------------------------------------------
+
+##Synopsis 
+The Storm Analysis contains details on the types of events which occur in USA, their impact on economics and human health.Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+##Data Processing
+
+Extracting the data into 'data' dataset.
+
+```{r}
+library(dplyr)
+data <- read.csv(bzfile("repdata%2Fdata%2FStormData.csv.bz2"))
+```
+
+Checked the names of the columns by using names function and further checked the class of 2 fields Fatalities and Injuries. Both are numeric.
+
+```{r}
+names(data)
+class(data$"FATALITIES")
+class(data$"INJURIES")
+```
+###1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+
+For the 1st Q, steps are as follows:
+Now extracting the evtype and fatalities/injuries into a new dataset for further use
+Assigning names to the columns
+
+```{r}
+test1 <- data[,c(8,23,24)]
+names(test1) <- c("Evtype", "Fatalities", "Injuries")
+```
+
+Summing the injuries and fatalities by evtype
+Arrange them in descending order and pick top 10 Evtype
+```{r}
+aggregatedData <- aggregate(Fatalities+Injuries ~ Evtype, test1, sum, na.rm=TRUE)
+names(aggregatedData) <- c("Evtype", "TotalEmission")
+aggregatedData <- arrange(aggregatedData, desc(TotalEmission))
+aggregatedData <- aggregatedData[1:10,]
+```
+
+##RESULTS
+Plotting a graph to show the population top 10 events are causing in USA
+```{r}
+par(las=2,mar=c(6,4,1,1))
+barplot(aggregatedData$TotalEmission, names.arg = aggregatedData$Evtype, xlab="", ylab="Events", main= "Population by event type in USA", cex.names  = 0.6,cex.axis = 0.6, col="Red")
+```
+The above plot shows the top 10 events which impact human health in USA, out of which Tornado being the worst.
+
+###2. Across the United States, which types of events have the greatest economic consequences?
+
+For the 2nd Q, the steps are as follows:
+
+Subsetting the Evtype, PROPDMGEXP and CROPDMGEXP into a new dataset. i.e pulled the property damage and crop damage values.
+```{r}
+test2 <- data[,c(8,25:28)]
+names(test2)<- c("Evtype", "PROPDMG", "PropertyDamage", "CropDMG", "CropDamage")
+```
+
+Checking the class for both the columns:
+```{r}
+class(test2$PropertyDamage)
+class(test2$CropDamage)
+```
+These are factor type.Checking the levels for each of the columns:
+```{r}
+unique(test2$PropertyDamage)
+unique(test2$CropDamage)
+```
+
+NA is assigned to "O" and factorized for both the columns(propertyDamage and CropDamage)
+```{r}
+test2$propFactor <- factor(test2$PropertyDamage, c("H","K","M","B","h","m","O"))
+test2$propFactor[is.na(test2$propFactor)]<- "O"
+table(test2$propFactor)
+
+test2$cropFactor <- factor(test2$CropDamage, c("K","M","B","k","m","O"))
+test2$cropFactor[is.na(test2$cropFactor)]<- "O"
+table(test2$cropFactor)
+```
+Assigning numeric values for the factors:
+```{r}
+test2$PROP[test2$propFactor=="K"]<-1000
+test2$PROP[test2$propFactor=="H"|test2$propFactor=="h"]<-100
+test2$PROP[test2$propFactor=="M"|test2$propFactor=="m"]<-1e6
+test2$PROP[test2$propFactor=="B"]<-1e9
+test2$PROP[test2$propFactor=="O"]<-1
+
+test2$CROP[test2$cropFactor=="K"|test2$cropFactor=="k"]<-1000
+test2$CROP[test2$cropFactor=="M"|test2$cropFactor=="m"]<-1e6
+test2$CROP[test2$cropFactor=="B"]<-1e9
+test2$CROP[test2$cropFactor=="O"]<-1
+```
+
+Multiplying the damage with the multipiers and saving them into new columns for both Property and Crop
+And aggregating by Evtype the total Damage (both crop and property)
+```{r}
+test2 <- mutate(test2, PropDMGValue=PROPDMG*PROP/1e6, CropDMGValue= CropDMG*CROP/1e6)
+aggregatedData2 <- aggregate(PropDMGValue+CropDMGValue~ Evtype, test2, sum, na.rm=TRUE)
+names(aggregatedData2) <- c("Evtype", "TotalEmission")
+```
+
+Arranging the dataset in descending order and picking the top 10 events causing the max. damage
+```{r}
+aggregatedData2 <- arrange(aggregatedData2, desc(TotalEmission))
+aggregatedData2 <- aggregatedData2[1:10,]
+```
+
+##RESULTS
+Plotting a graph to see the results
+```{r}
+par(las=2,mar=c(6,4,1,1))
+barplot(aggregatedData2$TotalEmission, names.arg = aggregatedData2$Evtype, xlab="", ylab="Events", main= "Damage by event type in USA", cex.names  = 0.6,cex.axis = 0.6, col="Red")
+```
+
+The plot shows the effect of different events(top 10) on damage caused, showing the Flood to be the max. destructor. 
